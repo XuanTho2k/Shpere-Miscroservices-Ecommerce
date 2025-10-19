@@ -6,6 +6,7 @@ export const connectToRabbitMQ = async () => {
   try {
     const connection = await amqp.connect("amqp://localhost");
     channel = await connection.createChannel();
+    await channel.assertExchange("order_created", "fanout", { durable: false });
   } catch (error) {
     console.log("Error connecting to RabbitMQ", error);
   }
@@ -21,6 +22,7 @@ export const publishMessage = async (queue, message) => {
 export const consumeMessage = async (queue, callback) => {
   if (!channel) throw new Error("RabbitMQ channel not found");
   await channel.assertQueue(queue, { durable: false });
+  await channel.bindQueue(queue, "order_created", "");
   channel.consume(queue, (message) => {
     if (message) {
       const data = JSON.parse(message.content.toString());

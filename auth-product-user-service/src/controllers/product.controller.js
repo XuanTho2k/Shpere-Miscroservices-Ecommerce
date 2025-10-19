@@ -40,6 +40,10 @@ export const updateProduct = async (req, res) => {
       event: "PRODUCT_UPDATED",
       data: product,
     });
+    await publishMessage("order_created", {
+      event: "ORDER_CREATED",
+      data: product,
+    });
     res.json(product);
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -33,36 +33,38 @@ io.on("connection", (socket) => {
   console.log("🔗 Client connected");
 });
 
-await connectToRabbitMQ();
+const start = async () => {
+  await connectToRabbitMQ();
 
-consumeMessage("product_updates", async (msg) => {
-  console.log("📩 [Order] Received:", msg);
-  if (msg.event === "PRODUCT_UPDATED") {
-    await prisma.order.upsert({
-      where: { id: msg.data.id },
-      update: { status: "cancelled", price: msg.data.price },
-      create: {
-        productId: msg.data.id,
-        quantity: 1,
-        status: "pending",
-        price: msg.data.price,
-      },
-    });
+  consumeMessage("product_updates", async (msg) => {
+    console.log("📩 [Order] Received:", msg);
+    if (msg.event === "PRODUCT_UPDATED") {
+      await prisma.order.upsert({
+        where: { id: msg.data.id },
+        update: { status: "cancelled", price: msg.data.price },
+        create: {
+          productId: msg.data.id,
+          quantity: 1,
+          status: "pending",
+          price: msg.data.price,
+        },
+      });
 
-    console.log("🔔 [Order] Emitting product updated event");
-    io.emit("product_updated", msg.data);
-  }
-});
+      console.log("🔔 [Order] Emitting product updated event");
+      io.emit("product_updated", msg.data);
+    }
+  });
 
-consumeMessage("order_created", async (msg) => {
-  console.log("📩 [Order] Received:", msg);
-  await createOrder(msg.data);
-  io.emit("order_created", msg.data);
-});
+  consumeMessage("order_created", async (msg) => {
+    console.log("📩 [Order] Received:", msg.event);
+    io.emit("order_created", msg.data);
+  });
 
-console.log(
-  "🐰 RabbitMQ connected - order service is ready to receive messages"
-);
-httpServer.listen(4001, () =>
-  console.log("🧾 Order Service + Socket.IO on port 4001")
-);
+  console.log(
+    "🐰 RabbitMQ connected - order service is ready to receive messages"
+  );
+  httpServer.listen(4001, () =>
+    console.log("🧾 Order Service + Socket.IO on port 4001")
+  );
+};
+start();

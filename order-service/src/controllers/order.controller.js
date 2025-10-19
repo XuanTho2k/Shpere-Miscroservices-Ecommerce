@@ -1,12 +1,11 @@
-export const createOrder = async (req, res) => {
+export const createOrder = async () => {
   try {
     const { productId, quantity } = req.body;
     const order = await prisma.order.create({
       data: { productId, quantity },
     });
-    res.json(order);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log("Error creating order", error);
   }
 };
 
