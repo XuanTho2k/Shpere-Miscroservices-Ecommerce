@@ -1,41 +1,100 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:5000"); // backend của OrderService
+// Kết nối tới notification service (port 5000)
+const socket = io("http://localhost:5000");
 
 export default function RealtimeLog() {
   const [logs, setLogs] = useState([]);
   const logEndRef = useRef(null);
 
   useEffect(() => {
-    socket.on("connect", () => addLog("✅ Connected to Socket.IO", "success"));
+    socket.on("connect", () =>
+      addLog("✅ Connected to Notification Service", "success")
+    );
     socket.on("disconnect", () =>
-      addLog("❌ Disconnected from server", "error")
+      addLog("❌ Disconnected from Notification Service", "error")
     );
 
+    socket.on("system", (data) => {
+      addLog(`🔧 ${data.msg}`, "info");
+    });
+
+    // Product events
     socket.on("product_update", (data) => {
-      addLog(`📦 Product updated: ${data.name} — Stock: ${data.stock}`, "info");
+      addLog(
+        `📦 Product updated: ${data.name || data.data?.name} — Price: $${
+          data.price || data.data?.price
+        }`,
+        "info"
+      );
     });
 
-    socket.on("product_out_of_stock", (data) => {
-      addLog(`⚠️ Product out of stock: ${data.name}`, "warning");
+    socket.on("product_created", (data) => {
+      addLog(
+        `✨ New product created: ${data.name || data.data?.name} — Price: $${
+          data.price || data.data?.price
+        }`,
+        "success"
+      );
     });
 
+    socket.on("product_deleted", (data) => {
+      addLog(`🗑️ Product deleted: ${data.name || data.data?.name}`, "warning");
+    });
+
+    // Order events
     socket.on("order_created", (data) => {
-      addLog(`🛒 New order: ${data.orderId}`, "success");
+      addLog(
+        `🛒 New order created: ID ${data.id || data.data?.id} — Product: ${
+          data.productId || data.data?.productId
+        }`,
+        "success"
+      );
     });
 
+    socket.on("order_updated", (data) => {
+      addLog(
+        `📝 Order updated: ID ${data.id || data.data?.id} — Status: ${
+          data.status || data.data?.status
+        }`,
+        "info"
+      );
+    });
+
+    socket.on("order_event", (data) => {
+      const eventType = data.event || "UNKNOWN";
+      const orderData = data.data || data;
+      addLog(
+        `🛒 [${eventType}] Order ID: ${orderData.id} — Status: ${orderData.status}`,
+        "info"
+      );
+    });
+
+    // System logs
     socket.on("log_event", (payload) => {
-      const { queue, data, time } = payload;
-      addLog(`[${queue.toUpperCase()}] ${JSON.stringify(data)}`, "info");
+      const { queue, data, time, type } = payload;
+
+      console.log(
+        "🚀 ~ RealTimeLog.jsx:78 ~ RealtimeLog ~ queue:",
+        queue,
+        time
+      );
+
+      const eventType = type || "SYSTEM";
+      addLog(`[${eventType.toUpperCase()}] ${JSON.stringify(data)}`, "info");
     });
 
     return () => {
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("system");
       socket.off("product_update");
-      socket.off("product_out_of_stock");
+      socket.off("product_created");
+      socket.off("product_deleted");
       socket.off("order_created");
+      socket.off("order_updated");
+      socket.off("order_event");
       socket.off("log_event");
     };
   }, []);

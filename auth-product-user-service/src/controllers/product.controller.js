@@ -1,5 +1,5 @@
 import prisma from "../config/db.js";
-import { publishMessage } from "../utils/rabbitmq.js";
+import { publishToExchange } from "../utils/rabbitmq.js";
 
 export const getProducts = async (req, res) => {
   try {
@@ -19,6 +19,15 @@ export const createProduct = async (req, res) => {
     const product = await prisma.product.create({
       data: { name, price: parseFloat(price) },
     });
+
+    // Publish product created event
+    await publishToExchange("product_events", {
+      event: "PRODUCT_CREATED",
+      data: product,
+      timestamp: new Date().toISOString(),
+      service: "auth-product-user-service",
+    });
+
     res.status(201).json(product);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -36,14 +45,15 @@ export const updateProduct = async (req, res) => {
       where: { id: parseInt(id) },
       data: { name, price: parseFloat(price) },
     });
-    await publishMessage("product_updates", {
+
+    // Publish product updated event
+    await publishToExchange("product_events", {
       event: "PRODUCT_UPDATED",
       data: product,
+      timestamp: new Date().toISOString(),
+      service: "auth-product-user-service",
     });
-    await publishMessage("order_created", {
-      event: "ORDER_CREATED",
-      data: product,
-    });
+
     res.json(product);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -53,7 +63,24 @@ export const updateProduct = async (req, res) => {
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
+    const product = await prisma.product.findUnique({
+      where: { id: parseInt(id) },
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
     await prisma.product.delete({ where: { id: parseInt(id) } });
+
+    // Publish product deleted event
+    await publishToExchange("product_events", {
+      event: "PRODUCT_DELETED",
+      data: { id: parseInt(id), name: product.name },
+      timestamp: new Date().toISOString(),
+      service: "auth-product-user-service",
+    });
+
     res.json({ message: "Product deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -69,13 +96,17 @@ export const updateStock = async (req, res) => {
       data: { price: parseFloat(price) },
     });
 
-    await publishMessage("product_updates", {
-      event: "PRODUCT_UPDATED",
+    // Publish product price updated event
+    await publishToExchange("product_events", {
+      event: "PRODUCT_PRICE_UPDATED",
       data: product,
+      timestamp: new Date().toISOString(),
+      service: "auth-product-user-service",
     });
 
-    res.json({ message: "Stock updated successfully", product });
+    res.json({ message: "Price updated successfully", product });
   } catch (error) {
-    console.log("Error updating stock", error);
+    console.error("Error updating price", error);
+    res.status(500).json({ message: error.message });
   }
 };
