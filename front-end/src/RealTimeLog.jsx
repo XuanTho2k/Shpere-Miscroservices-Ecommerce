@@ -30,6 +30,10 @@ export default function RealtimeLog() {
       );
     });
 
+    socket.on("old_logs", (data) => {
+      setLogs(data); // load lại log cũ từ Redis
+    });
+
     socket.on("product_created", (data) => {
       addLog(
         `✨ New product created: ${data.name || data.data?.name} — Price: $${
@@ -96,6 +100,7 @@ export default function RealtimeLog() {
       socket.off("order_updated");
       socket.off("order_event");
       socket.off("log_event");
+      socket.off("old_logs");
     };
   }, []);
 
@@ -125,14 +130,17 @@ export default function RealtimeLog() {
       </div>
 
       <div className="p-4 h-96 overflow-y-auto font-mono text-sm">
-        {logs.map((log, i) => (
-          <div key={i} className="mb-1">
-            <span className="text-gray-500">[{log.time}]</span>{" "}
-            <span className={typeColors[log.type] || "text-gray-300"}>
-              {log.msg}
-            </span>
-          </div>
-        ))}
+        {logs.map((log, i) => {
+          console.log("🚀 ~ RealTimeLog.jsx:134 ~ logs.map ~ log:", log.event);
+          return (
+            <div key={i} className="mb-1">
+              <span className="text-gray-500">[{log.time}]</span>{" "}
+              <span className={typeColors[log.type] || "text-gray-300"}>
+                {JSON.stringify(log) || log.msg}
+              </span>
+            </div>
+          );
+        })}
         <div ref={logEndRef} />
       </div>
     </div>

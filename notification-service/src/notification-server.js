@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 import { connectRabbitMQ, subscribe, publish } from "./rabbitmq.js";
+import { getLogs, saveLog } from "./redis.js";
 
 dotenv.config();
 
@@ -38,9 +39,15 @@ const io = new Server(httpServer, {
 // Lưu trữ connected clients
 const connectedClients = new Map();
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   console.log("🔌 Frontend connected:", socket.id);
   connectedClients.set(socket.id, socket);
+
+  const oldLogs = await getLogs();
+
+  console.log("🚀 ~ notification-server.js:48 ~ oldLogs:", oldLogs);
+
+  socket.emit("old_logs", oldLogs);
 
   socket.emit("system", {
     msg: "Connected to Notification Service",
@@ -68,8 +75,15 @@ async function start() {
     const subscriptions = [
       {
         queue: "product_updates",
-        handler: (data) => {
+        handler: async (data) => {
           console.log(`📦 [Product Update]`, data);
+
+          await saveLog({
+            ...data,
+            type: "product_update",
+            timestamp: new Date().toISOString(),
+          });
+
           broadcastToClients("product_update", {
             ...data,
             timestamp: new Date().toISOString(),
